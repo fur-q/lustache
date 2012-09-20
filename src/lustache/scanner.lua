@@ -45,7 +45,6 @@ end
 
 function scanner:new(str)
   local out = {
-    str  = str,
     tail = str,
     pos  = 0
   }

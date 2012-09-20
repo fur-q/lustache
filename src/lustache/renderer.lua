@@ -123,27 +123,6 @@ local function nest_tokens(tokens)
   return tree
 end
 
--- Combines the values of consecutive text tokens in the given `tokens` array
--- to a single token.
-local function squash_tokens(tokens)
-  local out, txt = {}, {}
-  for _, v in ipairs(tokens) do
-    if v.type == "text" then
-      txt[#txt+1] = v.value
-    else
-      if #txt > 0 then
-        out[#out+1] = { type = "text", value = table_concat(txt) }
-        txt = {}
-      end
-      out[#out+1] = v
-    end
-  end
-  if #txt > 0 then
-    out[#out+1] = { type = "text", value = table_concat(txt) }
-  end
-  return out
-end
-
 local function make_context(view)
   if not view then return view end
   return view.magic == "1235123123" and view or Context:new(view)
@@ -273,12 +252,6 @@ function renderer:parse(template, tags)
   local tag_patterns = escape_tags(tags)
   local scanner = Scanner:new(template)
   local tokens = {} -- token buffer
-  local spaces = {} -- indices of whitespace tokens on the current line
-  local has_tag = false -- is there a {{tag} on the current line?
-  local non_space = false -- is there a non-space char on the current line?
-
-  -- Strips all whitespace tokens array for the current line if there was
-  -- a {{#tag}} on it and otherwise only space
 
   local type, value, chr
 
@@ -286,24 +259,13 @@ function renderer:parse(template, tags)
     value = scanner:scan_until(tag_patterns[1])
 
     if value then
-      for i = 1, #value do
-        chr = string_sub(value,i,i)
-
-        if string_find(chr, "%s+") then
-          spaces[#spaces+1] = #tokens
-        else
-          non_space = true
-        end
-
-        tokens[#tokens+1] = { type = "text", value = chr }
-      end
+      tokens[#tokens+1] = { type = "text", value = value }
     end
 
     if not scanner:scan(tag_patterns[1]) then
       break
     end
 
-    has_tag = true
     type = scanner:scan(patterns.tag) or "name"
 
     scanner:scan(patterns.white)
@@ -327,17 +289,13 @@ function renderer:parse(template, tags)
 
     tokens[#tokens+1] = { type = type, value = value }
 
-    if type == "name" or type == "{" or type == "&" then
-      non_space = true --> what does this do?
-    end
-
     if type == "=" then
       tags = string_split(value, patterns.space)
       tag_patterns = escape_tags(tags)
     end
   end
 
-  return nest_tokens(squash_tokens(tokens))
+  return nest_tokens(tokens)
 end
 
 function renderer:new()
