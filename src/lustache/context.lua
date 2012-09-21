@@ -1,5 +1,5 @@
-local string_find, string_split, tostring, type =
-      string.find, string.split, tostring, type
+local string_find, string_gmatch, string_sub, tostring, type =
+      string.find, string.gmatch, string.sub, tostring, type
 
 local context = {}
 
@@ -12,44 +12,26 @@ function context:push(view)
 end
 
 function context:lookup(name)
-  local value = self.cache[name]
+  if self.cache[name] then return self.cache[name] end
+  if name == "." then return self.view end
 
-  if not value then
-    if name == "." then
-      value = self.view
-    else
-      local context = self
+  local context, value = self, self.view
 
-      while context do
-        if string_find(name, ".") > 0 then
-          local names = string_split(name, ".")
-          local i = 0
-
-          value = context.view
-
-          if(type(value)) == "number" then
-            value = tostring(value)
-          end
-
-          while value and i < #names do
-            i = i + 1
-            value = value[names[i]]
-          end
-        else
-          value = context.view[name]
-        end
-
-        if value then
-          break
-        end
-
-        context = context.parent
-      end
+  local dot = string_find(name, "%.")
+  if dot then
+    for m in string_gmatch(name, "[^.]+") do
+      value = value[m]
+      if not value then break end
     end
-
-    self.cache[name] = value
+  else
+    while context do
+      value = type(context.view) == "table" and context.view[name] or nil
+      if value then break end
+      context = context.parent
+    end
   end
 
+  self.cache[name] = value
   return value
 end
 

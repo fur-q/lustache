@@ -3,8 +3,8 @@ local Context  = require "lustache.context"
 
 local error, ipairs, loadstring, pairs, setmetatable, tostring, type = 
       error, ipairs, loadstring, pairs, setmetatable, tostring, type 
-local math_floor, math_max, string_find, string_gsub, string_split, string_sub, table_concat, table_insert, table_remove =
-      math.floor, math.max, string.find, string.gsub, string.split, string.sub, table.concat, table.insert, table.remove
+local math_floor, math_max, string_gsub, string_gmatch, table_concat, table_remove =
+      math.floor, math.max, string.gsub, string.gmatch, table.concat, table.remove
 
 local patterns = {
   white = "%s*",
@@ -180,31 +180,21 @@ function renderer:_section(name, context, callback)
 
   if type(value) == "table" then
     if is_array(value) then
-      local buffer = ""
-
+      local buffer = {}
       for i,v in ipairs(value) do
-        buffer = buffer .. callback(context:push(v), self)
+        buffer[#buffer+1] = callback(context:push(v), self)
       end
-
-      return buffer
+      return table_concat(buffer)
     end
-
     return callback(context:push(value), self)
   elseif type(value) == "function" then
-    local section_text = callback(context, self)
-
-    local scoped_render = function(template)
-      return self:render(template, context)
-    end
-
-    return value(self, section_text, scoped_render) or ""
-  else
-    if value then
-      return callback(context, self)
-    end
+    return value(
+      self,
+      callback(context, self),
+      function(template) return self:render(template, context) end
+    ) or ""
   end
-
-  return ""
+  return value and callback(context, self) or ""
 end
 
 function renderer:_inverted(name, context, callback)
@@ -290,7 +280,8 @@ function renderer:parse(template, tags)
     tokens[#tokens+1] = { type = type, value = value }
 
     if type == "=" then
-      tags = string_split(value, patterns.space)
+      tags = {}
+      for t in string_gmatch(value, "%S+") do tags[#tags+1] = t end
       tag_patterns = escape_tags(tags)
     end
   end
